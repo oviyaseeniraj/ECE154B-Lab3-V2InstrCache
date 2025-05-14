@@ -87,11 +87,11 @@ for (i = 0; i < 10000; i=i+1) begin
     if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
 
     // NEW: Count cache accesses (fetches, hits, misses)
-    if (top.riscv.icache.ReadEnable) begin
+    if (top.icache.ReadEnable) begin
         fetches++;
-        if (top.riscv.icache.Ready) begin
+        if (top.icache.Ready) begin
             hits++;
-        end else if (top.riscv.icache.MemReadRequest) begin
+        end else if (top.icache.MemReadRequest) begin
             misses++;
         end
     end
