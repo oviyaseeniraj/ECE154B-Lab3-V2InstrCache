@@ -39,8 +39,10 @@ reg                    valid_bits [NUM_SETS-1:0][NUM_WAYS-1:0];
 reg [WORD_SIZE-1:0]    words [NUM_SETS-1:0][NUM_WAYS-1:0][BLOCK_WORDS-1:0];
 
 reg [$clog2(NUM_WAYS)-1:0] write_way;
-reg [$clog2(NUM_WAYS)-1:0] hit_way; // NEW
+reg [$clog2(NUM_WAYS)-1:0] hit_way; 
 reg [1:0] burst_word_index;
+reg pending_refill;
+reg refilled_this_cycle; // NEW
 
 integer i, j, k;
 always @ (posedge Clk) begin
@@ -60,17 +62,25 @@ always @ (posedge Clk) begin
         MemReadRequest <= 0;
         MemReadAddress <= 0;
         burst_word_index <= 0;
-        hit_way <= 0; // NEW
+        hit_way <= 0;
+        pending_refill <= 0;
+        refilled_this_cycle <= 0; // NEW
     end else begin
-        Ready <= 0; // NEW: Pulse only one cycle
-        if (ReadEnable && !Busy) begin
+        Ready <= 0;
+
+        if (!Busy && ReadEnable && !pending_refill) begin
             for (i = 0; i < NUM_WAYS; i = i + 1) begin
                 if (valid_bits[set_index][i] && (tags[set_index][i] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET])) begin
-                    hit_way <= i; // NEW
+                    hit_way <= i;
                     Ready <= 1;
-                    Instruction <= words[set_index][i][ReadAddress[BLOCK_OFFSET-1:0]]; // NEW
+                    Instruction <= words[set_index][i][ReadAddress[BLOCK_OFFSET-1:0]];
                 end
             end
+        end else if (pending_refill && refilled_this_cycle) begin // NEW
+            Ready <= 1;
+            Instruction <= words[set_index][write_way][ReadAddress[BLOCK_OFFSET-1:0]];
+            pending_refill <= 0;
+            refilled_this_cycle <= 0;
         end
     end
 end
@@ -100,6 +110,7 @@ always @ (posedge Clk) begin
     if (MemReadRequest && MemDataReady) begin
         words[set_index][write_way][burst_word_index] <= MemDataIn;
         burst_word_index <= burst_word_index + 1;
+
         if (burst_word_index == BLOCK_WORDS - 1) begin
             found_empty_way = 0;
             for (write_way_index = 0; write_way_index < NUM_WAYS; write_way_index = write_way_index + 1) begin
@@ -115,8 +126,8 @@ always @ (posedge Clk) begin
             tags[set_index][write_way] <= ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET];
             MemReadRequest <= 0;
             Busy <= 0;
-            Ready <= 1; // NEW: Signal instruction is ready after refill
-            Instruction <= words[set_index][write_way][ReadAddress[BLOCK_OFFSET-1:0]]; // NEW
+            pending_refill <= 1;
+            refilled_this_cycle <= 1; // NEW
         end else begin
             MemReadAddress <= MemReadAddress + 4;
         end
