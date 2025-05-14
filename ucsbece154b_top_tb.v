@@ -64,6 +64,8 @@ reg [31:0] pending_address;
 reg [5:0] delay_counter;
 reg [1:0] word_index;
 reg sdram_busy;
+reg ReadEnable = 0;
+reg [31:0] ReadData;
 
 initial begin
     $readmemh("text.dat", memory);
