@@ -1,4 +1,9 @@
-// ucsbece154_imem.v - Verilog 2001 Compliant SDRAM Memory Model
+// ucsbece154_imem.v
+// All Rights Reserved
+// Copyright (c) 2024 UCSB ECE
+// Distribution Prohibited
+
+`define MIN(A,B) (((A)<(B))?(A):(B))
 
 module ucsbece154_imem #(
     parameter TEXT_SIZE = 64,
@@ -20,6 +25,31 @@ wire [31:0] a_i = ReadAddress;//address to memory map read address
 wire [31:0] rd_o;// read data from memory
 
 // Implement SDRAM interface here
+
+// sends first word of data to cache controller after T0_DELAY cycles
+// raise DataReady when data is available
+// bus = ReadAddress, DataIn, ReadRequest, and DataReady signals
+// keep receiving readrequest=1 and valid readdress until data is ready
+integer counter = T0_DELAY;
+always @(posedge clk) begin
+    if (reset) begin
+        DataReady <= 1'b0;
+        DataIn <= 32'b0;
+    end else begin
+        if (ReadRequest) begin
+            // wait T0_DELAY cycles before sending data
+            if (counter > 0) begin
+                counter <= counter - 1;
+            end else begin
+                DataIn <= rd_o;
+                DataReady <= 1'b1;
+            end
+        end else begin
+            DataReady <= 1'b0;
+        end
+    end
+end
+
 
 // instantiate/initialize BRAM
 reg [31:0] TEXT [0:TEXT_SIZE-1];
@@ -56,3 +86,5 @@ end
 `endif
 
 endmodule
+
+`undef MIN
