@@ -10,6 +10,7 @@ module ucsbece154b_top (
 );
 
 wire [31:0] pc, instr, readdata;
+wire StallF;
 wire [31:0] writedata, dataadr;
 wire  memwrite,Readenable,busy;
 wire [31:0] SDRAM_ReadAddress;
@@ -18,9 +19,9 @@ wire SDRAM_ReadRequest;
 wire SDRAM_DataReady;
 wire ReadyF;
 ucsbece154b_icache icache (
-    .clk(clk),
+    .Clk(clk),
     .Reset(reset),
-    .ReadEnable(Readenable),          
+    .ReadEnable(~StallF),          
     .ReadAddress(pc),
     .Instruction(instr),
     .Ready(ReadyF),
@@ -42,7 +43,8 @@ ucsbece154b_riscv_pipe riscv (
     .ALUResultM_o(dataadr), 
     .WriteDataM_o(writedata),
     .ReadDataM_i(readdata),
-    .Ready(ReadyF)//added Ready instruction to stall fetch stage in case of cache miss
+    .StallF(StallF),
+    .Ready(ReadyF),//added Ready instruction to stall fetch stage in case of cache miss
 );
 ucsbece154_imem imem (
     .clk(clk),

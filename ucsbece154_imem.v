@@ -26,6 +26,30 @@ wire [31:0] rd_o;// read data from memory
 
 // Implement SDRAM interface here
 
+// sends first word of data to cache controller after T0_DELAY cycles
+// raise DataReady when data is available
+// bus = ReadAddress, DataIn, ReadRequest, and DataReady signals
+// keep receiving readrequest=1 and valid readdress until data is ready
+always @(posedge clk) begin
+    if (reset) begin
+        DataReady <= 1'b0;
+        DataIn <= 32'b0;
+    end else begin
+        if (ReadRequest) begin
+            // wait T0_DELAY cycles before sending data
+            if (T0_DELAY > 0) begin
+                T0_DELAY <= T0_DELAY - 1;
+            end else begin
+                DataIn <= rd_o;
+                DataReady <= 1'b1;
+            end
+        end else begin
+            DataReady <= 1'b0;
+        end
+    end
+end
+
+
 // instantiate/initialize BRAM
 reg [31:0] TEXT [0:TEXT_SIZE-1];
 
