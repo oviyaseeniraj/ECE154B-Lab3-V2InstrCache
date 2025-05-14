@@ -13,10 +13,11 @@ module ucsbece154b_riscv_pipe (
     output wire  [31:0] ALUResultM_o,
     output wire  [31:0] WriteDataM_o,
     input        [31:0] ReadDataM_i,
+    output StallF,
     input  ReadyF //added Ready instruction to stall fetch stage in case of cache miss
 );
 
-wire  StallF, StallD, FlushD, RegWriteW, FlushE, ALUSrcE; //, ZeroE, PCSrcE;
+wire  StallD, FlushD, RegWriteW, FlushE, ALUSrcE; //, ZeroE, PCSrcE;
 wire [6:0] op;
 wire [2:0] funct3;
 wire funct7b5;
@@ -24,7 +25,7 @@ wire [2:0] ImmSrcD;
 wire [2:0] ALUControlE;
 wire [1:0] ForwardAE, ForwardBE, ResultSrcW, ResultSrcM;
 wire [4:0] Rs1D, Rs2D, Rs1E, Rs2E, RdE, RdM, RdW;
-wire BranchE, JumpE, BranchTypeE, MisspredictE,ReadyF;
+wire BranchE, JumpE, BranchTypeE, MisspredictE;
 
 
 ucsbece154b_controller c (
@@ -40,7 +41,6 @@ ucsbece154b_controller c (
     .RdE_i(RdE),
     .RdM_i(RdM),
     .RdW_i(RdW),
-
     .Ready_F(ReadyF), //added Ready instruction to stall fetch stage in case of cache miss 
     .StallF_o(StallF),  
     .StallD_o(StallD),
@@ -58,7 +58,7 @@ ucsbece154b_controller c (
     .ResultSrcM_o (ResultSrcM),
     .BranchE_o (BranchE),
     .JumpE_o (JumpE),
-    .BranchTypeE_o (BranchTypeE) 
+    .BranchTypeE_o (BranchTypeE)
 );
 
 
@@ -95,7 +95,6 @@ ucsbece154b_datapath dp (
     .ResultSrcM_i (ResultSrcM),
     .BranchE_i (BranchE),
     .JumpE_i (JumpE),
-    .BranchTypeE_i (BranchTypeE),
-    .PCnewF_o(PCnewF_o)
+    .BranchTypeE_i (BranchTypeE) 
 );
 endmodule
