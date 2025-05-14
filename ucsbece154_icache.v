@@ -29,7 +29,7 @@ localparam NUM_TAG_BITS = 32 - $clog2(NUM_SETS) - $clog2(BLOCK_WORDS) - 2; // 32
 localparam NUM_BLOCK_BITS = $clog2(BLOCK_WORDS);
 
 
-reg set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFSET+WORD_OFFSET]; // get set index from read address
+wire set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFSET+WORD_OFFSET]; // get set index from read address
 
 // implementation of the cache here
 // Create table for cache:
@@ -83,6 +83,7 @@ integer i_ways;
 reg hit;
 always @ (posedge Clk) begin
     // TODO check on setup time for when readenable is supplied
+    hit = 0;
     if (!Busy && ReadEnable) begin
         // check if readaddress is in cache aka "valid"
         for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
@@ -115,7 +116,7 @@ always @ (posedge Clk) begin
     if (MemReadRequest && MemDataReady) begin
         // write to cache
         for (write_way_index = 0; write_way_index < NUM_WAYS; write_way_index = write_way_index + 1) begin
-            if (!valid_bits[set_index][write_way]) begin
+            if (!valid_bits[set_index][write_way_index]) begin
                 // found empty way - write to it
                 found_empty_way = 1;
                 write_way <= write_way_index;
