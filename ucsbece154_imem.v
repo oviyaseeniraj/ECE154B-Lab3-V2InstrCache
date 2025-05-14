@@ -47,9 +47,9 @@ wire [TEXT_ADDRESS_WIDTH-1:0] text_address = a_i[2 +: TEXT_ADDRESS_WIDTH]-(TEXT_
 wire [31:0] text_data = TEXT[ text_address ];
 
 // set rd_o iff a_i is in range 
-assign rd_o =
-    text_enable ? text_data : 
-    {32{1'bz}}; // not driven by this memory
+// assign rd_o =
+//     text_enable ? text_data : 
+//     {32{1'bz}}; // not driven by this memory
 
 // Implement SDRAM interface here
 
@@ -89,7 +89,7 @@ always @ (posedge clk) begin
         // send data to cache controller
         if (word < BLOCK_WORDS) begin
             addr = {frontend, word, 2'b00};
-            TEXT[addr] <= rd_o;
+            rd_o = TEXT[addr];
             DataIn <= rd_o;
             DataReady <= 1'b1;
             word <= word + 1;
