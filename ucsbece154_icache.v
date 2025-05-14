@@ -34,8 +34,7 @@ reg set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFS
 // implementation of the cache here
 // Create table for cache:
 // | Valid Bit (1 bit) | Tag (25 bits - ReadAddress[31:7]) | Data (128 bits - 4 words) |    --->  x4 for each way; this is one entry for each set (8 total)
-// to index into cache table, obtain set index from read address  
-reg [$clog2(NUM_SETS)-1:0] set_index;
+// to index into cache table, obtain set index from read address
 
 // 1 per way per set
 reg [NUM_TAG_BITS-1:0] tags [NUM_SETS-1:0][NUM_WAYS-1:0];
@@ -43,6 +42,8 @@ reg [NUM_WAYS-1:0] valid_bits [NUM_SETS-1:0][NUM_WAYS-1:0];
 
 // 4 words per way per set
 reg [WORD_SIZE-1:0] words [NUM_SETS-1:0][NUM_WAYS-1:0][BLOCK_WORDS-1:0];
+
+reg write_way;
 
 // READY SIGNAL
 always @ (*) begin
@@ -78,7 +79,6 @@ end
 
 // READ
 
-reg write_way;
 integer i_ways;
 reg hit;
 always @ (posedge Clk) begin
@@ -88,7 +88,7 @@ always @ (posedge Clk) begin
         for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
             if (valid_bits[set_index][i_ways] && (tags[set_index][i_ways] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1])) begin
                 // hit - read from cache
-                write_way = i_ways;
+                write_way <= i_ways;
                 Ready <= 1;
                 Busy <= 0;
                 hit = 1;
@@ -118,14 +118,14 @@ always @ (posedge Clk) begin
             if (!valid_bits[set_index][write_way]) begin
                 // found empty way - write to it
                 found_empty_way = 1;
-                write_way = write_way_index;
+                write_way <= write_way_index;
             end
         end
 
         // if all ways are full, evict one way (random)
         if (!found_empty_way) begin
             // evict a random way
-            write_way = $urandom_range(0, NUM_WAYS-1);
+            write_way <= $urandom_range(0, NUM_WAYS-1);
         end
 
         // read data from memory and write to cache
