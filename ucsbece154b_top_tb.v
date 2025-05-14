@@ -20,14 +20,8 @@ integer jumppredictedcorrectly = 0;
 integer branchtotal = 0;
 integer branchpredictedcorrectly = 0;
 
-reg [31:0] mem_data_in;
-reg mem_data_ready;
-
 ucsbece154b_top top (
-    .clk(clk),
-    .reset(reset),
-    .MemDataIn(mem_data_in),
-    .MemDataReady(mem_data_ready)
+    .clk(clk), .reset(reset)
 );
 
 wire [31:0] reg_zero = top.riscv.dp.rf.zero;
@@ -70,10 +64,7 @@ wire [31:0] reg_t6 = top.riscv.dp.rf.t6;
 //
 
 integer i;
-<<<<<<< HEAD
-=======
 integer fetches, hits, misses;
->>>>>>> parent of d7c0bba (tb)
 initial begin
 $display( "Begin simulation." );
 //\\ =========================== \\//
@@ -84,44 +75,10 @@ reset = 1;
 reset = 0;
 
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> parent of d7c0bba (tb)
 // Test for program 
 for (i = 0; i < 10000; i=i+1) begin
     @(negedge clk);
 
-<<<<<<< HEAD
-// counter for jumps
-
-if(top.riscv.dp.BranchE_i) branchtotal++;
-if(top.riscv.dp.JumpE_i) jumptotal++;
-if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
-if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
-
-// counter for branches
-
-//         if(fetchpc==32'h00010068) begin
-//		$display("#cycles = %d", i);  
-//	 break;
-//	 end
-end 
-       
-   // `ASSERT(fetchpc == 32'h00010064, ("reached last instruction"));    
-
-
-// WRITE YOUR TEST HERE
-
-// `ASSERT(rg_zero==32'b0, ("reg_zero incorrect"));
-// `ASSERT(MEM_10000070==32'hBEEF000, ("mem.DATA[29] //incorrect"));
-
-
-//\\ =========================== \\//
-$display( "End simulation.");
-$stop;
-=======
 
     // counter for jumps
     if(top.riscv.dp.BranchE_i) branchtotal++;
@@ -147,7 +104,6 @@ $display("Cache Hits:    %0d", hits);
 $display("Cache Misses:  %0d", misses);
 $stop;
 
->>>>>>> parent of d7c0bba (tb)
 end
 
 endmodule
