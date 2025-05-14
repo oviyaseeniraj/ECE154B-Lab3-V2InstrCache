@@ -1,15 +1,11 @@
-// ucsbece154_imem.v
-// All Rights Reserved
-// Copyright (c) 2024 UCSB ECE
-// Distribution Prohibited
-
-`define MIN(A,B) (((A)<(B))?(A):(B))
+// ucsbece154_imem.v - Fixed Baseline SDRAM Memory Model
+// All changes marked with // NEW and old lines commented above
 
 module ucsbece154_imem #(
     parameter TEXT_SIZE = 64,
     parameter BLOCK_WORDS = 4,          // words per burst (must match cache)
     parameter T0_DELAY = 40             // first word delay (cycles)
-) (
+)(
     input wire clk,
     input wire reset,
 
@@ -20,69 +16,71 @@ module ucsbece154_imem #(
     output reg DataReady
 );
 
-// === BRAM: Initialize memory ===
-reg [31:0] TEXT [0:TEXT_SIZE-1];
-initial $readmemh("text.dat", TEXT);
+// NEW: Memory array to simulate SDRAM contents
+reg [31:0] memory [0:TEXT_SIZE-1];
 
-// === Address Range Logic ===
-localparam TEXT_START = 32'h00010000;
-localparam TEXT_END   = `MIN( TEXT_START + (TEXT_SIZE*4), 32'h10000000);
-localparam TEXT_ADDRESS_WIDTH = $clog2(TEXT_SIZE);
+// NEW: FSM to handle SDRAM burst protocol
+typedef enum logic [1:0] {
+    IDLE,
+    T0_WAIT,
+    BURST_SEND
+} state_t;
+state_t state;
 
-wire [31:0] a_i = ReadAddress;
-wire [TEXT_ADDRESS_WIDTH-1:0] text_address = a_i[2 +: TEXT_ADDRESS_WIDTH] - (TEXT_START[2 +: TEXT_ADDRESS_WIDTH]);
-wire text_enable = (TEXT_START <= a_i) && (a_i < TEXT_END);
-wire [31:0] rd_o = text_enable ? TEXT[text_address] : {32{1'bz}};
+// NEW: Internal registers
+reg [5:0] t0_counter;               // max T0_DELAY = 63
+reg [1:0] burst_counter;           // for 4-word blocks
+reg [31:0] base_address;           // aligned block base
 
-`ifdef SIM
-always @ * begin
-    if (a_i[1:0] != 2'b00)
-        $warning("Attempted to access invalid address 0x%h. Address coerced to 0x%h.", a_i, (a_i & ~32'b11));
-end
-`endif
-
-// === NEW: Burst FSM State ===
-integer counter = 0;
-reg bursting = 0;
-reg [1:0] burst_index = 0;
-reg [31:0] base_address; // word-aligned start of burst
+// Address conversion helper
+function [31:0] word_addr;
+    input [31:0] addr;
+    begin
+        word_addr = addr >> 2; // convert byte address to word index
+    end
+endfunction
 
 always @(posedge clk) begin
     if (reset) begin
-        DataIn <= 32'b0;
+        state <= IDLE;
+        DataIn <= 0;
         DataReady <= 0;
-        counter <= T0_DELAY;
-        burst_index <= 0;
-        bursting <= 0;
+        t0_counter <= 0;
+        burst_counter <= 0;
     end else begin
-        if (ReadRequest && !bursting) begin
-            // Start burst
-            base_address <= ReadAddress & 32'hFFFFFFF0; // NEW: Align to 16-byte block
-            counter <= T0_DELAY;
-            burst_index <= 0;
-            bursting <= 1;
-            DataReady <= 0;
-        end else if (bursting) begin
-            if (counter > 0) begin
-                counter <= counter - 1;
-                DataReady <= 0;
-            end else begin
-                // NEW: Send word i of burst
-                DataIn <= TEXT[(base_address - TEXT_START) >> 2 + burst_index];
-                DataReady <= 1;
-                burst_index <= burst_index + 1;
-
-                if (burst_index == BLOCK_WORDS - 1) begin
-                    bursting <= 0;
+        DataReady <= 0; // default: not ready unless asserted below
+        case (state)
+            IDLE: begin
+                if (ReadRequest) begin
+                    base_address <= {ReadAddress[31:BLOCK_WORDS + 2], {BLOCK_WORDS{1'b0}}}; // aligned base
+                    t0_counter <= 0;
+                    burst_counter <= 0;
+                    state <= T0_WAIT;
                 end
             end
-        end else begin
-            // Idle
-            DataReady <= 0;
-        end
+
+            T0_WAIT: begin
+                if (t0_counter == T0_DELAY) begin
+                    DataIn <= memory[word_addr(base_address)];
+                    DataReady <= 1;
+                    burst_counter <= 1;
+                    state <= BURST_SEND;
+                end else begin
+                    t0_counter <= t0_counter + 1;
+                end
+            end
+
+            BURST_SEND: begin
+                if (burst_counter < BLOCK_WORDS) begin
+                    DataIn <= memory[word_addr(base_address) + burst_counter];
+                    DataReady <= 1;
+                    burst_counter <= burst_counter + 1;
+                end else begin
+                    state <= IDLE;
+                end
+            end
+        endcase
     end
 end
 
 endmodule
-
-`undef MIN

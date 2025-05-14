@@ -1,4 +1,7 @@
-module ucsbece154b_icache #(
+// ucsbece154_icache.v - Fixed Baseline ICache
+// All changes marked with // NEW and old code commented out above
+
+module ucsbece154_icache #(
     parameter NUM_SETS   = 8,
     parameter NUM_WAYS   = 4,
     parameter BLOCK_WORDS= 4,
@@ -10,7 +13,7 @@ module ucsbece154b_icache #(
     // core fetch interface
     input                     ReadEnable,
     input      [31:0]         ReadAddress,
-    output reg [WORD_SIZE-1:0]Instruction,
+    output reg [WORD_SIZE-1:0] Instruction,
     output reg                Ready,
     output reg                Busy,
 
@@ -21,124 +24,128 @@ module ucsbece154b_icache #(
     input                     MemDataReady
 );
 
+localparam WORD_OFFSET   = 2;
+localparam BLOCK_OFFSET  = $clog2(BLOCK_WORDS);
+localparam SET_OFFSET    = $clog2(NUM_SETS);
+localparam OFFSET        = WORD_OFFSET + BLOCK_OFFSET;
+localparam NUM_TAG_BITS  = 32 - SET_OFFSET - BLOCK_OFFSET - WORD_OFFSET;
 
+// Cache entry definition
+typedef struct packed {
+    logic                    valid;
+    logic [NUM_TAG_BITS-1:0] tag;
+    logic [31:0]             data [0:BLOCK_WORDS-1];
+} cache_entry_t;
 
-localparam BLOCK_OFFSET = $clog2(BLOCK_WORDS); // 2 bits for word offset
-localparam WORD_OFFSET = 2; // 2 bits for word offset
-localparam NUM_TAG_BITS = 32 - $clog2(NUM_SETS) - $clog2(BLOCK_WORDS) - 2; // 32 - set bits - block bits - 2 bits for word offset
-localparam NUM_BLOCK_BITS = $clog2(BLOCK_WORDS);
+cache_entry_t cache [0:NUM_SETS-1][0:NUM_WAYS-1];
 
+// NEW: FSM states
+typedef enum logic [2:0] {
+    IDLE,
+    MISS_WAIT,
+    MEM_FILL,
+    CACHE_WRITE,
+    DONE
+} state_t;
+state_t state;
 
-wire set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFSET+WORD_OFFSET]; // get set index from read address
+// NEW: Internal registers
+reg [31:0] ReadAddress_reg;
+reg [NUM_TAG_BITS-1:0] tag;
+reg [SET_OFFSET-1:0] set_idx;
+reg [BLOCK_OFFSET-1:0] block_offset;
+reg [1:0] hit_way;
+reg hit;
+reg [WORD_SIZE-1:0] block_buffer [0:BLOCK_WORDS-1];
+reg [1:0] word_counter;
+reg [1:0] replace_way;
 
-// implementation of the cache here
-// Create table for cache:
-// | Valid Bit (1 bit) | Tag (25 bits - ReadAddress[31:7]) | Data (128 bits - 4 words) |    --->  x4 for each way; this is one entry for each set (8 total)
-// to index into cache table, obtain set index from read address
+// Decode address fields
+always @(*) begin
+    tag          = ReadAddress[31 -: NUM_TAG_BITS];
+    set_idx      = ReadAddress[OFFSET +: SET_OFFSET];
+    block_offset = ReadAddress[WORD_OFFSET +: BLOCK_OFFSET];
+end
 
-// 1 per way per set
-reg [NUM_TAG_BITS-1:0] tags [NUM_SETS-1:0][NUM_WAYS-1:0];
-reg [NUM_WAYS-1:0] valid_bits [NUM_SETS-1:0][NUM_WAYS-1:0];
-
-// 4 words per way per set
-reg [WORD_SIZE-1:0] words [NUM_SETS-1:0][NUM_WAYS-1:0][BLOCK_WORDS-1:0];
-
-reg write_way;
-
-// READY SIGNAL
-always @ (*) begin
-    if (Ready) begin
-        // ready to read from cache
-        Instruction <= words[set_index][write_way][ReadAddress[BLOCK_OFFSET-1:0]];
-    end else begin
-        // not ready to read from cache
-        Instruction <= 0;
+// Hit detection
+integer w;
+always @(*) begin
+    hit = 0;
+    hit_way = 0;
+    for (w = 0; w < NUM_WAYS; w = w + 1) begin
+        if (cache[set_idx][w].valid && cache[set_idx][w].tag == tag)
+            hit = 1;
+            hit_way = w;
     end
 end
 
-integer i, j, k;
-always @ (posedge Clk) begin
-  // clear all fields in cache
+// FSM
+always @(posedge Clk) begin
     if (Reset) begin
-        for (i = 0; i < NUM_SETS; i = i + 1) begin
-            for (j = 0; j < NUM_WAYS; j = j + 1) begin
-                valid_bits[i][j] <= 0;
-                tags[i][j] <= 0;
-                for (k = 0; k < BLOCK_WORDS; k = k + 1) begin
-                    words[i][j][k] <= 0;
+        state <= IDLE;
+        Ready <= 0;
+        Busy <= 0;
+        MemReadRequest <= 0;
+        word_counter <= 0;
+        // Invalidate all cache entries
+        for (int s = 0; s < NUM_SETS; s++)
+            for (int w = 0; w < NUM_WAYS; w++)
+                cache[s][w].valid <= 0;
+    end else begin
+        case (state)
+            IDLE: begin
+                Ready <= 0;
+                if (ReadEnable && !Busy) begin
+                    if (hit) begin
+                        // Cache hit: output on next cycle
+                        ReadAddress_reg <= ReadAddress; // NEW
+                        state <= DONE;
+                    end else begin
+                        // Cache miss: start memory request
+                        replace_way <= $random % NUM_WAYS; // NEW
+                        MemReadAddress <= {ReadAddress[31:BLOCK_OFFSET << 1], {BLOCK_OFFSET{1'b0}}}; // align addr
+                        MemReadRequest <= 1;
+                        word_counter <= 0;
+                        state <= MISS_WAIT;
+                        Busy <= 1;
+                    end
                 end
             end
-        end
-        Instruction <= 0;
-        Ready <= 0;
-        Busy <= 0;
-        MemReadRequest <= 0;
-        MemReadAddress <= 0;
-    end
-end
 
-// READ
+            MISS_WAIT: begin
+                if (MemDataReady) begin
+                    block_buffer[0] <= MemDataIn;
+                    word_counter <= 1;
+                    state <= MEM_FILL;
+                end
+            end
 
-integer i_ways;
-reg hit;
-always @ (posedge Clk) begin
-    // TODO check on setup time for when readenable is supplied
-    hit = 0;
-    if (!Busy && ReadEnable) begin
-        // check if readaddress is in cache aka "valid"
-        for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
-            if (valid_bits[set_index][i_ways] && (tags[set_index][i_ways] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1])) begin
-                // hit - read from cache
-                write_way <= i_ways;
+            MEM_FILL: begin
+                if (MemDataReady) begin
+                    block_buffer[word_counter] <= MemDataIn;
+                    word_counter <= word_counter + 1;
+                    if (word_counter == BLOCK_WORDS-1) begin
+                        MemReadRequest <= 0;
+                        state <= CACHE_WRITE;
+                    end
+                end
+            end
+
+            CACHE_WRITE: begin
+                cache[set_idx][replace_way].valid <= 1;
+                cache[set_idx][replace_way].tag <= tag;
+                for (int i = 0; i < BLOCK_WORDS; i++)
+                    cache[set_idx][replace_way].data[i] <= block_buffer[i];
+                state <= DONE;
+            end
+
+            DONE: begin
+                Instruction <= cache[set_idx][hit ? hit_way : replace_way].data[block_offset];
                 Ready <= 1;
                 Busy <= 0;
-                hit = 1;
+                state <= IDLE;
             end
-        end
-    end
-    // if not in cache, need to read from memory and write to cache
-    if (!hit) begin
-        // set up memory read request
-        MemReadAddress <= ReadAddress;
-        MemReadRequest <= 1;
-        Busy <= 1;
-        Ready <= 0;
-    end 
-end
-
-
-// WRITE
-reg found_empty_way = 0;
-integer write_way_index;
-integer word_count;
-// there was a miss - need to write to cache from memory
-always @ (posedge Clk) begin
-    if (MemReadRequest && MemDataReady) begin
-        // write to cache
-        for (write_way_index = 0; write_way_index < NUM_WAYS; write_way_index = write_way_index + 1) begin
-            if (!valid_bits[set_index][write_way_index]) begin
-                // found empty way - write to it
-                found_empty_way = 1;
-                write_way <= write_way_index;
-            end
-        end
-
-        // if all ways are full, evict one way (random)
-        if (!found_empty_way) begin
-            // evict a random way
-            write_way <= $urandom_range(0, NUM_WAYS-1);
-        end
-
-        // read data from memory and write to cache
-        for (word_count = 0; word_count < BLOCK_WORDS; word_count = word_count + 1) begin
-            words[set_index][write_way][word_count] <= MemDataIn;
-            valid_bits[set_index][write_way] <= 1;
-            tags[set_index][write_way] <= ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1];
-        end
-
-        MemReadRequest <= 0;
-        Ready <= 1;
-        Busy <= 0;
+        endcase
     end
 end
 

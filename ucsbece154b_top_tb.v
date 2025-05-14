@@ -65,12 +65,15 @@ integer fetches = 0;
 integer hits = 0;
 integer misses = 0;
 
+reg last_readenable;
+
 initial begin
     $display("Begin simulation.");
     reset = 1;
     @(negedge clk);
     @(negedge clk);
     reset = 0;
+    last_readenable = 0;
 
     // Test for program 
     for (i = 0; i < 10000; i = i + 1) begin
@@ -82,15 +85,20 @@ initial begin
         if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
         if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
 
-        // Count cache accesses (fetches, hits, misses)
-        if (top.icache.ReadEnable) begin
+        // NEW: track fetches only on rising edge of ReadEnable
+        if (top.icache.ReadEnable && !last_readenable) begin
             fetches++;
-            if (top.icache.Ready) begin
-                hits++;
-            end else if (top.icache.MemReadRequest) begin
-                misses++;
-            end
         end
+        // NEW: track hits when Ready is high
+        if (top.icache.ReadEnable && top.icache.Ready) begin
+            hits++;
+        end
+        // NEW: track misses when MemReadRequest goes high
+        if (top.icache.MemReadRequest) begin
+            misses++;
+        end
+
+        last_readenable = top.icache.ReadEnable;
     end 
 
     $display("End simulation.");
