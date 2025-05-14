@@ -14,8 +14,14 @@ integer jumppredictedcorrectly = 0;
 integer branchtotal = 0;
 integer branchpredictedcorrectly = 0;
 
+reg [31:0] mem_data_in;
+reg mem_data_ready;
+
 ucsbece154b_top top (
-    .clk(clk), .reset(reset)
+    .clk(clk),
+    .reset(reset),
+    .MemDataIn(mem_data_in),
+    .MemDataReady(mem_data_ready)
 );
 
 wire [31:0] reg_zero = top.riscv.dp.rf.zero;
@@ -64,15 +70,12 @@ reg [31:0] pending_address;
 reg [5:0] delay_counter;
 reg [1:0] word_index;
 reg sdram_busy;
-reg ReadEnable = 0;
-reg [31:0] ReadData;
 
 initial begin
     $readmemh("text.dat", memory);
 
     $display("Begin simulation.");
     reset = 1;
-    ReadEnable = 0;
     @(negedge clk);
     @(negedge clk);
     reset = 0;
@@ -101,17 +104,18 @@ initial begin
         if (sdram_busy) begin
             if (delay_counter > 0) begin
                 delay_counter = delay_counter - 1;
+                mem_data_ready = 0;
             end else begin
-                top.icache.MemDataIn = memory[(pending_address >> 2) + word_index];
-                top.icache.MemDataReady = 1;
+                mem_data_in = memory[(pending_address >> 2) + word_index];
+                mem_data_ready = 1;
                 word_index = word_index + 1;
                 if (word_index == 4) begin
                     sdram_busy = 0;
-                    top.icache.MemDataReady = 0;
+                    mem_data_ready = 0;
                 end
             end
         end else begin
-            top.icache.MemDataReady = 0;
+            mem_data_ready = 0;
         end
     end
 

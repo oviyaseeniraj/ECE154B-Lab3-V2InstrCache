@@ -6,8 +6,12 @@
 
 
 module ucsbece154b_top (
-    input clk, reset
+    input clk,
+    input reset,
+    input [31:0] MemDataIn,     // NEW
+    input        MemDataReady   // NEW
 );
+
 
 wire [31:0] pc, pcf, instr, readdata;
 wire StallF;
@@ -21,16 +25,17 @@ wire ReadyF;
 ucsbece154_icache icache (
     .Clk(clk),
     .Reset(reset),
-    .ReadEnable(~StallF),          
-    .ReadAddress(pcf),
-    .Instruction(instr),
-    .Ready(ReadyF),
-    .Busy(busy),                   
-    .MemReadAddress(SDRAM_ReadAddress),
-    .MemReadRequest(SDRAM_ReadRequest),
-    .MemDataIn(SDRAM_DataIn),
-    .MemDataReady(SDRAM_DataReady)
+    .ReadEnable(ReadEnable),             // assumed connected
+    .ReadAddress(ReadAddress),           // assumed connected
+    .Instruction(Instruction),           // assumed connected
+    .Ready(Ready),                       // assumed connected
+    .Busy(Busy),                         // assumed connected
+    .MemReadAddress(MemReadAddress),     // assumed connected
+    .MemReadRequest(MemReadRequest),     // assumed connected
+    .MemDataIn(MemDataIn),               // NEW
+    .MemDataReady(MemDataReady)          // NEW
 );
+
 
 // processor and memories are instantiated here
 ucsbece154b_riscv_pipe riscv (
