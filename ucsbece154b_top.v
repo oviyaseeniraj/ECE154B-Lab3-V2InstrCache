@@ -22,7 +22,7 @@ ucsbece154b_icache icache (
     .Clk(clk),
     .Reset(reset),
     .ReadEnable(~StallF),          
-    .ReadAddress(pcf),
+    .ReadAddress(pc),
     .Instruction(instr),
     .Ready(ReadyF),
     .Busy(busy),                   
