@@ -29,10 +29,8 @@ ucsbece154b_icache icache (
     .MemReadAddress(SDRAM_ReadAddress),
     .MemReadRequest(SDRAM_ReadRequest),
     .MemDataIn(SDRAM_DataIn),
-    .MemDataReady(SDRAM_DataReady),
-
+    .MemDataReady(SDRAM_DataReady)
 );
-
 
 // processor and memories are instantiated here
 ucsbece154b_riscv_pipe riscv (
@@ -44,8 +42,9 @@ ucsbece154b_riscv_pipe riscv (
     .WriteDataM_o(writedata),
     .ReadDataM_i(readdata),
     .StallF(StallF),
-    .Ready(ReadyF),//added Ready instruction to stall fetch stage in case of cache miss
+    .Ready(ReadyF)//added Ready instruction to stall fetch stage in case of cache miss
 );
+
 ucsbece154_imem imem (
     .clk(clk),
     .reset(reset),
@@ -55,6 +54,7 @@ ucsbece154_imem imem (
     .DataIn(SDRAM_DataIn),
     .DataReady(SDRAM_DataReady)
 );
+
 ucsbece154_dmem dmem (
     .clk(clk), .we_i(memwrite),
     .a_i(dataadr), .wd_i(writedata),
