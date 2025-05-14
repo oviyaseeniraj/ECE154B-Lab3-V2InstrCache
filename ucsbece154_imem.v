@@ -41,7 +41,7 @@ always @(posedge clk) begin
             if (counter > 0) begin
                 counter <= counter - 1;
             end else begin
-                DataIn <= rd_o;
+                // send all words in block to cache controller in bursts at one cycle apart
                 DataReady <= 1'b1;
             end
         end else begin
@@ -50,6 +50,28 @@ always @(posedge clk) begin
     end
 end
 
+// burst logic
+reg [1:0] word;
+reg [31:0] addr;
+always @ (posedge clk) begin
+    if (DataReady) begin
+        // send all words in block to cache controller in bursts at one cycle apart
+        // splice readaddress
+        frontend = ReadAddress[31:4];
+        // send data to cache controller
+        if (word < BLOCK_WORDS) begin
+            addr = {frontend, word, 2'b00};
+            TEXT[addr] <= rd_o;
+            DataIn <= rd_o;
+            DataReady <= 1'b1;
+            word <= word + 1;
+        end else begin
+            DataIn <= 32'bzzzzzzzzzz;
+            DataReady <= 1'b0;
+            word <= 2'b0;
+        end
+    end
+end
 
 // instantiate/initialize BRAM
 reg [31:0] TEXT [0:TEXT_SIZE-1];
