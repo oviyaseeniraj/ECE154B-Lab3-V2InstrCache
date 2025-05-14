@@ -1,85 +1,83 @@
-// ucsbece154_icache.v - Fixed Baseline ICache
-// All changes marked with // NEW and old code commented out above
+// ucsbece154_icache.v - Pure Verilog 2001 Compliant Baseline ICache
+// All changes marked with // NEW and old lines commented above
 
-module ucsbece154_icache #(
-    parameter NUM_SETS   = 8,
-    parameter NUM_WAYS   = 4,
-    parameter BLOCK_WORDS= 4,
-    parameter WORD_SIZE  = 32
-)(
-    input                     Clk,
-    input                     Reset,
-
-    // core fetch interface
-    input                     ReadEnable,
-    input      [31:0]         ReadAddress,
-    output reg [WORD_SIZE-1:0] Instruction,
-    output reg                Ready,
-    output reg                Busy,
-
-    // SDRAM-controller interface
-    output reg [31:0]         MemReadAddress,
-    output reg                MemReadRequest,
-    input      [31:0]         MemDataIn,
-    input                     MemDataReady
+module ucsbece154_icache (
+    Clk,
+    Reset,
+    ReadEnable,
+    ReadAddress,
+    Instruction,
+    Ready,
+    Busy,
+    MemReadAddress,
+    MemReadRequest,
+    MemDataIn,
+    MemDataReady
 );
 
-localparam WORD_OFFSET   = 2;
-localparam BLOCK_OFFSET  = $clog2(BLOCK_WORDS);
-localparam SET_OFFSET    = $clog2(NUM_SETS);
-localparam OFFSET        = WORD_OFFSET + BLOCK_OFFSET;
-localparam NUM_TAG_BITS  = 32 - SET_OFFSET - BLOCK_OFFSET - WORD_OFFSET;
+parameter NUM_SETS = 8;
+parameter NUM_WAYS = 4;
+parameter BLOCK_WORDS = 4;
+parameter WORD_SIZE = 32;
 
-// Cache entry definition
-typedef struct packed {
-    logic                    valid;
-    logic [NUM_TAG_BITS-1:0] tag;
-    logic [31:0]             data [0:BLOCK_WORDS-1];
-} cache_entry_t;
+input Clk;
+input Reset;
+input ReadEnable;
+input [31:0] ReadAddress;
+output reg [WORD_SIZE-1:0] Instruction;
+output reg Ready;
+output reg Busy;
+output reg [31:0] MemReadAddress;
+output reg MemReadRequest;
+input [31:0] MemDataIn;
+input MemDataReady;
 
-cache_entry_t cache [0:NUM_SETS-1][0:NUM_WAYS-1];
+// Address calculations
+parameter WORD_OFFSET = 2;
+parameter BLOCK_OFFSET = 2; // log2(BLOCK_WORDS)
+parameter SET_OFFSET = 3;   // log2(NUM_SETS)
+parameter OFFSET = WORD_OFFSET + BLOCK_OFFSET;
+parameter NUM_TAG_BITS = 32 - SET_OFFSET - BLOCK_OFFSET - WORD_OFFSET;
 
-// NEW: FSM states
-typedef enum logic [2:0] {
-    IDLE,
-    MISS_WAIT,
-    MEM_FILL,
-    CACHE_WRITE,
-    DONE
-} state_t;
-state_t state;
+// Cache structures
+reg [0:0] valid [0:NUM_SETS-1][0:NUM_WAYS-1];
+reg [NUM_TAG_BITS-1:0] tag_array [0:NUM_SETS-1][0:NUM_WAYS-1];
+reg [31:0] data_array [0:NUM_SETS-1][0:NUM_WAYS-1][0:BLOCK_WORDS-1];
 
-// NEW: Internal registers
+// Internal signals
 reg [31:0] ReadAddress_reg;
-reg [NUM_TAG_BITS-1:0] tag;
 reg [SET_OFFSET-1:0] set_idx;
 reg [BLOCK_OFFSET-1:0] block_offset;
+reg [NUM_TAG_BITS-1:0] tag;
 reg [1:0] hit_way;
 reg hit;
-reg [WORD_SIZE-1:0] block_buffer [0:BLOCK_WORDS-1];
+reg [31:0] block_buffer [0:BLOCK_WORDS-1];
 reg [1:0] word_counter;
 reg [1:0] replace_way;
+reg [2:0] state;
 
-// Decode address fields
-always @(*) begin
-    tag          = ReadAddress[31 -: NUM_TAG_BITS];
-    set_idx      = ReadAddress[OFFSET +: SET_OFFSET];
-    block_offset = ReadAddress[WORD_OFFSET +: BLOCK_OFFSET];
-end
+parameter IDLE = 3'd0;
+parameter MISS_WAIT = 3'd1;
+parameter MEM_FILL = 3'd2;
+parameter CACHE_WRITE = 3'd3;
+parameter DONE = 3'd4;
 
-// Hit detection
-integer w;
+// Hit detection logic
+integer w, b;
 always @(*) begin
     hit = 0;
     hit_way = 0;
+    set_idx = ReadAddress[OFFSET +: SET_OFFSET];
+    tag = ReadAddress[31 -: NUM_TAG_BITS];
+    block_offset = ReadAddress[WORD_OFFSET +: BLOCK_OFFSET];
     for (w = 0; w < NUM_WAYS; w = w + 1) begin
-        if (cache[set_idx][w].valid && cache[set_idx][w].tag == tag)
+        if (valid[set_idx][w] && tag_array[set_idx][w] == tag) begin
             hit = 1;
-            hit_way = w;
+            hit_way = w[1:0];
+        end
     end
 end
 
-// FSM
 always @(posedge Clk) begin
     if (Reset) begin
         state <= IDLE;
@@ -87,27 +85,24 @@ always @(posedge Clk) begin
         Busy <= 0;
         MemReadRequest <= 0;
         word_counter <= 0;
-        // Invalidate all cache entries
-        for (int s = 0; s < NUM_SETS; s++)
-            for (int w = 0; w < NUM_WAYS; w++)
-                cache[s][w].valid <= 0;
+        for (w = 0; w < NUM_WAYS; w = w + 1)
+            for (b = 0; b < NUM_SETS; b = b + 1)
+                valid[b][w] <= 0;
     end else begin
+        Ready <= 0;
         case (state)
             IDLE: begin
-                Ready <= 0;
                 if (ReadEnable && !Busy) begin
                     if (hit) begin
-                        // Cache hit: output on next cycle
-                        ReadAddress_reg <= ReadAddress; // NEW
+                        ReadAddress_reg <= ReadAddress;
                         state <= DONE;
                     end else begin
-                        // Cache miss: start memory request
-                        replace_way <= $random % NUM_WAYS; // NEW
-                        MemReadAddress <= {ReadAddress[31:BLOCK_OFFSET << 1], {BLOCK_OFFSET{1'b0}}}; // align addr
+                        replace_way <= $random % NUM_WAYS;
+                        MemReadAddress <= {ReadAddress[31:OFFSET], {OFFSET{1'b0}}};
                         MemReadRequest <= 1;
                         word_counter <= 0;
-                        state <= MISS_WAIT;
                         Busy <= 1;
+                        state <= MISS_WAIT;
                     end
                 end
             end
@@ -132,15 +127,18 @@ always @(posedge Clk) begin
             end
 
             CACHE_WRITE: begin
-                cache[set_idx][replace_way].valid <= 1;
-                cache[set_idx][replace_way].tag <= tag;
-                for (int i = 0; i < BLOCK_WORDS; i++)
-                    cache[set_idx][replace_way].data[i] <= block_buffer[i];
+                valid[set_idx][replace_way] <= 1;
+                tag_array[set_idx][replace_way] <= tag;
+                for (w = 0; w < BLOCK_WORDS; w = w + 1)
+                    data_array[set_idx][replace_way][w] <= block_buffer[w];
                 state <= DONE;
             end
 
             DONE: begin
-                Instruction <= cache[set_idx][hit ? hit_way : replace_way].data[block_offset];
+                if (hit)
+                    Instruction <= data_array[set_idx][hit_way][block_offset];
+                else
+                    Instruction <= block_buffer[block_offset];
                 Ready <= 1;
                 Busy <= 0;
                 state <= IDLE;
