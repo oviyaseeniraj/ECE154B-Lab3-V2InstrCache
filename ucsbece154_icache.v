@@ -29,7 +29,7 @@ localparam NUM_TAG_BITS = 32 - $clog2(NUM_SETS) - $clog2(BLOCK_WORDS) - 2; // 32
 localparam NUM_BLOCK_BITS = $clog2(BLOCK_WORDS);
 
 
-set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFSET+WORD_OFFSET]; // get set index from read address
+reg set_index = ReadAddress[$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET:BLOCK_OFFSET+WORD_OFFSET]; // get set index from read address
 
 // implementation of the cache here
 // Create table for cache:
