@@ -3,14 +3,11 @@
 // Copyright (c) 2024 UCSB ECE
 // Distribution Prohibited
 
-
 `define SIM
-
 `define ASSERT(CONDITION, MESSAGE) if ((CONDITION)==1'b1); else begin $error($sformatf MESSAGE); end
 
 module ucsbece154b_top_tb ();
 
-// test bench contents
 reg clk = 1;
 always #1 clk <= ~clk;
 reg reset;
@@ -57,53 +54,51 @@ wire [31:0] reg_t4 = top.riscv.dp.rf.t4;
 wire [31:0] reg_t5 = top.riscv.dp.rf.t5;
 wire [31:0] reg_t6 = top.riscv.dp.rf.t6;
 
- wire [31:0] fetchpc = top.riscv.dp.PCPlus4W;
-
-// wire [31:0] MEM_10000000 = top.dmem.DATA[6'd0];
-
-//
+wire [31:0] fetchpc = top.riscv.dp.PCPlus4W;
 
 integer i;
-integer fetches, hits, misses;
+
+// OLD: variables never initialized, so output was 'x'
+// integer fetches, hits, misses;
+// NEW: initialize hit/miss/fetch counters
+integer fetches = 0;
+integer hits = 0;
+integer misses = 0;
+
 initial begin
-$display( "Begin simulation." );
-//\\ =========================== \\//
-
-reset = 1;
-@(negedge clk);
-@(negedge clk);
-reset = 0;
-
-
-// Test for program 
-for (i = 0; i < 10000; i=i+1) begin
+    $display("Begin simulation.");
+    reset = 1;
     @(negedge clk);
+    @(negedge clk);
+    reset = 0;
 
+    // Test for program 
+    for (i = 0; i < 10000; i = i + 1) begin
+        @(negedge clk);
 
-    // counter for jumps
-    if(top.riscv.dp.BranchE_i) branchtotal++;
-    if(top.riscv.dp.JumpE_i) jumptotal++;
-    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
-    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
+        // counter for jumps and branches
+        if (top.riscv.dp.BranchE_i) branchtotal++;
+        if (top.riscv.dp.JumpE_i) jumptotal++;
+        if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
+        if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
 
-    // NEW: Count cache accesses (fetches, hits, misses)
-    if (top.icache.ReadEnable) begin
-        fetches++;
-        if (top.icache.Ready) begin
-            hits++;
-        end else if (top.icache.MemReadRequest) begin
-            misses++;
+        // Count cache accesses (fetches, hits, misses)
+        if (top.icache.ReadEnable) begin
+            fetches++;
+            if (top.icache.Ready) begin
+                hits++;
+            end else if (top.icache.MemReadRequest) begin
+                misses++;
+            end
         end
-    end
-end 
+    end 
 
-$display("End simulation.");
-$display("--- Performance Stats ---");
-$display("Cache Fetches: %0d", fetches);
-$display("Cache Hits:    %0d", hits);
-$display("Cache Misses:  %0d", misses);
-$stop;
-
+    $display("End simulation.");
+    $display("--- Performance Stats ---");
+    $display("Cache Fetches: %0d", fetches);
+    $display("Cache Hits:    %0d", hits);
+    $display("Cache Misses:  %0d", misses);
+    $stop;
 end
 
 endmodule
