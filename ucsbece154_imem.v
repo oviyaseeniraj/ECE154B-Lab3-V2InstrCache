@@ -24,6 +24,33 @@ wire [31:0] a_i = ReadAddress;//address to memory map read address
 
 wire [31:0] rd_o;// read data from memory
 
+// instantiate/initialize BRAM
+reg [31:0] TEXT [0:TEXT_SIZE-1];
+
+// initialize memory with test program. Change this with your file for running custom code
+initial $readmemh("text.dat", TEXT);
+
+// calculate address bounds for memory
+localparam TEXT_START = 32'h00010000;
+localparam TEXT_END   = `MIN( TEXT_START + (TEXT_SIZE*4), 32'h10000000);
+
+// calculate address width
+localparam TEXT_ADDRESS_WIDTH = $clog2(TEXT_SIZE);
+
+// create flags to specify whether in-range 
+wire text_enable = (TEXT_START <= a_i) && (a_i < TEXT_END);
+
+// create addresses 
+wire [TEXT_ADDRESS_WIDTH-1:0] text_address = a_i[2 +: TEXT_ADDRESS_WIDTH]-(TEXT_START[2 +: TEXT_ADDRESS_WIDTH]);
+
+// get read-data 
+wire [31:0] text_data = TEXT[ text_address ];
+
+// set rd_o iff a_i is in range 
+assign rd_o =
+    text_enable ? text_data : 
+    {32{1'bz}}; // not driven by this memory
+
 // Implement SDRAM interface here
 
 // sends first word of data to cache controller after T0_DELAY cycles
@@ -53,6 +80,7 @@ end
 // burst logic
 reg [1:0] word;
 reg [31:0] addr;
+reg [TEXT_ADDRESS_WIDTH-1:0] frontend;
 always @ (posedge clk) begin
     if (DataReady) begin
         // send all words in block to cache controller in bursts at one cycle apart
@@ -72,33 +100,6 @@ always @ (posedge clk) begin
         end
     end
 end
-
-// instantiate/initialize BRAM
-reg [31:0] TEXT [0:TEXT_SIZE-1];
-
-// initialize memory with test program. Change this with your file for running custom code
-initial $readmemh("text.dat", TEXT);
-
-// calculate address bounds for memory
-localparam TEXT_START = 32'h00010000;
-localparam TEXT_END   = `MIN( TEXT_START + (TEXT_SIZE*4), 32'h10000000);
-
-// calculate address width
-localparam TEXT_ADDRESS_WIDTH = $clog2(TEXT_SIZE);
-
-// create flags to specify whether in-range 
-wire text_enable = (TEXT_START <= a_i) && (a_i < TEXT_END);
-
-// create addresses 
-wire [TEXT_ADDRESS_WIDTH-1:0] text_address = a_i[2 +: TEXT_ADDRESS_WIDTH]-(TEXT_START[2 +: TEXT_ADDRESS_WIDTH]);
-
-// get read-data 
-wire [31:0] text_data = TEXT[ text_address ];
-
-// set rd_o iff a_i is in range 
-assign rd_o =
-    text_enable ? text_data : 
-    {32{1'bz}}; // not driven by this memory
 
 `ifdef SIM
 always @ * begin
