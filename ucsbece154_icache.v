@@ -77,6 +77,8 @@ always @ (posedge Clk) begin
 end
 
 // READ
+
+reg write_way;
 integer i_ways;
 reg hit;
 always @ (posedge Clk) begin
@@ -86,6 +88,7 @@ always @ (posedge Clk) begin
         for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
             if (valid_bits[set_index][i_ways] && (tags[set_index][i_ways] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1])) begin
                 // hit - read from cache
+                write_way = i_ways;
                 Ready <= 1;
                 Busy <= 0;
                 hit = 1;
@@ -105,7 +108,6 @@ end
 
 // WRITE
 reg found_empty_way = 0;
-reg write_way;
 integer write_way_index;
 integer word_count;
 // there was a miss - need to write to cache from memory
