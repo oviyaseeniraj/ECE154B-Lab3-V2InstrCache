@@ -64,6 +64,7 @@ wire [31:0] reg_t6 = top.riscv.dp.rf.t6;
 //
 
 integer i;
+integer fetches, hits, misses;
 initial begin
 $display( "Begin simulation." );
 //\\ =========================== \\//
@@ -74,39 +75,35 @@ reset = 1;
 reset = 0;
 
 
-
-
 // Test for program 
 for (i = 0; i < 10000; i=i+1) begin
     @(negedge clk);
 
-// counter for jumps
 
-if(top.riscv.dp.BranchE_i) branchtotal++;
-if(top.riscv.dp.JumpE_i) jumptotal++;
-if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
-if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
+    // counter for jumps
+    if(top.riscv.dp.BranchE_i) branchtotal++;
+    if(top.riscv.dp.JumpE_i) jumptotal++;
+    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
+    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
 
-// counter for branches
-
-//         if(fetchpc==32'h00010068) begin
-//		$display("#cycles = %d", i);  
-//	 break;
-//	 end
+    // NEW: Count cache accesses (fetches, hits, misses)
+    if (top.riscv.icache.ReadEnable) begin
+        fetches++;
+        if (top.riscv.icache.Ready) begin
+            hits++;
+        end else if (top.riscv.icache.MemReadRequest) begin
+            misses++;
+        end
+    end
 end 
-       
-   // `ASSERT(fetchpc == 32'h00010064, ("reached last instruction"));    
 
-
-// WRITE YOUR TEST HERE
-
-// `ASSERT(rg_zero==32'b0, ("reg_zero incorrect"));
-// `ASSERT(MEM_10000070==32'hBEEF000, ("mem.DATA[29] //incorrect"));
-
-
-//\\ =========================== \\//
-$display( "End simulation.");
+$display("End simulation.");
+$display("--- Performance Stats ---");
+$display("Cache Fetches: %0d", fetches);
+$display("Cache Hits:    %0d", hits);
+$display("Cache Misses:  %0d", misses);
 $stop;
+
 end
 
 endmodule
