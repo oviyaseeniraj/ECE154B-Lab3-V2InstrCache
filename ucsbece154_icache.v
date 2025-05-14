@@ -14,7 +14,7 @@ module ucsbece154b_icache #(
 
     // core fetch interface
     input                     ReadEnable,
-    input      [31:0]         ReadAddress,
+    input      [31:0]         ReadAddress, // should be PCNewF from datapath
     output reg [WORD_SIZE-1:0]Instruction,
     output reg                Ready,
     output reg                Busy,
@@ -89,7 +89,7 @@ integer i_ways;
 reg hit;
 always @ (posedge Clk) begin
     hit = 0;
-    if (!Busy && !pending_refill) begin
+    if (ReadEnable && !Busy && !MemReadRequest && !pending_refill) begin // NEW condition
         for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
             if (valid_bits[set_index][i_ways] && (tags[set_index][i_ways] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET])) begin
                 hit = 1;
