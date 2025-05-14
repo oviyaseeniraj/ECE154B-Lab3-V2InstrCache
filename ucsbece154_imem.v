@@ -30,6 +30,7 @@ wire [31:0] rd_o;// read data from memory
 // raise DataReady when data is available
 // bus = ReadAddress, DataIn, ReadRequest, and DataReady signals
 // keep receiving readrequest=1 and valid readdress until data is ready
+integer counter = T0_DELAY;
 always @(posedge clk) begin
     if (reset) begin
         DataReady <= 1'b0;
@@ -37,8 +38,8 @@ always @(posedge clk) begin
     end else begin
         if (ReadRequest) begin
             // wait T0_DELAY cycles before sending data
-            if (T0_DELAY > 0) begin
-                T0_DELAY <= T0_DELAY - 1;
+            if (counter > 0) begin
+                counter <= counter - 1;
             end else begin
                 DataIn <= rd_o;
                 DataReady <= 1'b1;
