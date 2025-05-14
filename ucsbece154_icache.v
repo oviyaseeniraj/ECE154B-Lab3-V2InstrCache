@@ -67,8 +67,9 @@ always @ (posedge Clk) begin
         refilled_this_cycle <= 0;
     end else begin
         Ready <= 0;
+        refilled_this_cycle <= 0;
 
-        if (!Busy && !pending_refill) begin
+        if (ReadEnable && !Busy && !pending_refill) begin
             for (i = 0; i < NUM_WAYS; i = i + 1) begin
                 if (valid_bits[set_index][i] && (tags[set_index][i] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET])) begin
                     hit_way <= i;
@@ -76,11 +77,12 @@ always @ (posedge Clk) begin
                     Instruction <= words[set_index][i][ReadAddress[BLOCK_OFFSET-1:0]];
                 end
             end
-        end else if (pending_refill && refilled_this_cycle) begin
-            Ready <= 1;
-            Instruction <= words[set_index][write_way][ReadAddress[BLOCK_OFFSET-1:0]];
-            pending_refill <= 0;
-            refilled_this_cycle <= 0;
+        end else if (ReadEnable && pending_refill) begin
+            if (refilled_this_cycle) begin
+                Ready <= 1;
+                Instruction <= words[set_index][write_way][ReadAddress[BLOCK_OFFSET-1:0]];
+                pending_refill <= 0;
+            end
         end
     end
 end
@@ -89,7 +91,7 @@ integer i_ways;
 reg hit;
 always @ (posedge Clk) begin
     hit = 0;
-    if (ReadEnable && !Busy && !MemReadRequest && !pending_refill) begin // NEW condition
+    if (ReadEnable && !Busy && !MemReadRequest && !pending_refill) begin
         for (i_ways = 0; i_ways < NUM_WAYS; i_ways = i_ways + 1) begin
             if (valid_bits[set_index][i_ways] && (tags[set_index][i_ways] == ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET])) begin
                 hit = 1;
