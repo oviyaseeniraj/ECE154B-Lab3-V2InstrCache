@@ -130,15 +130,20 @@ always @ (posedge Clk) begin
         end
 
         // read data from memory and write to cache
-        for (word_count = 0; word_count < BLOCK_WORDS; word_count = word_count + 1) begin
-            words[set_index][write_way][word_count] <= MemDataIn;
-            valid_bits[set_index][write_way] <= 1;
-            tags[set_index][write_way] <= ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1];
-        end
+        words[set_index][write_way][word_count] <= MemDataIn;
+        valid_bits[set_index][write_way] <= 1;
+        tags[set_index][write_way] <= ReadAddress[31:$clog2(NUM_SETS)+BLOCK_OFFSET+WORD_OFFSET+1];
 
-        MemReadRequest <= 0;
-        Ready <= 1;
-        Busy <= 0;
+        if (word_count < BLOCK_WORDS-1) begin
+            word_count <= word_count + 1;
+        end else begin
+            // reset word count
+            word_count <= 0;
+            found_empty_way = 0;
+            MemReadRequest <= 0;
+            Busy <= 0;
+            Ready <= 1;
+        end
     end
 end
 
