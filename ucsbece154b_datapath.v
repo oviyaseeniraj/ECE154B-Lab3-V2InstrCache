@@ -77,13 +77,6 @@ always @ (posedge clk) begin
     else if (!StallF_i) PCF_o <= PCnewF;
 end
 
-// set pcnewf_o to pcnewf
-always @ (posedge clk) begin
-    if (reset)        PCnewF_o <= pc_start;
-    else if (!StallF_i) PCnewF_o <= PCnewF;
-end
-
-
 // ***** DECODE STAGE ********************************
 reg [31:0] InstrD, PCPlus4D, PCD;
 wire [4:0] RdD;

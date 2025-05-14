@@ -1,87 +1,58 @@
 // ucsbece154_imem.v - Verilog 2001 Compliant SDRAM Memory Model
 
-module ucsbece154_imem (
-    clk,
-    reset,
-    ReadRequest,
-    ReadAddress,
-    DataIn,
-    DataReady
+module ucsbece154_imem #(
+    parameter TEXT_SIZE = 64,
+    parameter BLOCK_WORDS = 4,          // words per burst (must match cache)
+    parameter T0_DELAY = 40             // first word delay (cycles)
+) (
+    input wire clk,
+    input wire reset,
+
+    input wire ReadRequest,
+    input wire [31:0] ReadAddress,
+
+    output reg [31:0] DataIn,
+    output reg DataReady
 );
+   
+wire [31:0] a_i = ReadAddress;//address to memory map read address
 
-parameter TEXT_SIZE = 256;
-parameter BLOCK_WORDS = 4;          // words per burst (must match cache)
-parameter T0_DELAY = 40;            // first word delay (cycles)
+wire [31:0] rd_o;// read data from memory
 
-input clk;
-input reset;
-input ReadRequest;
-input [31:0] ReadAddress;
-output reg [31:0] DataIn;
-output reg DataReady;
+// Implement SDRAM interface here
 
-reg [31:0] memory [0:TEXT_SIZE-1];
-reg [1:0] word_counter;
-reg [5:0] delay_counter;
-reg [31:0] base_address;
-reg [1:0] state;
+// instantiate/initialize BRAM
+reg [31:0] TEXT [0:TEXT_SIZE-1];
 
-parameter IDLE = 2'd0;
-parameter T0_WAIT = 2'd1;
-parameter BURST = 2'd2;
+// initialize memory with test program. Change this with your file for running custom code
+initial $readmemh("text.dat", TEXT);
 
-function [31:0] word_addr;
-    input [31:0] addr;
-    begin
-        word_addr = addr >> 2; // convert byte address to word index
-    end
-endfunction
+// calculate address bounds for memory
+localparam TEXT_START = 32'h00010000;
+localparam TEXT_END   = `MIN( TEXT_START + (TEXT_SIZE*4), 32'h10000000);
 
-integer i;
+// calculate address width
+localparam TEXT_ADDRESS_WIDTH = $clog2(TEXT_SIZE);
 
-always @(posedge clk) begin
-    if (reset) begin
-        state <= IDLE;
-        DataReady <= 0;
-        DataIn <= 0;
-        delay_counter <= 0;
-        word_counter <= 0;
-        for (i = 0; i < TEXT_SIZE; i = i + 1)
-            memory[i] <= 32'h00000013 + i; // preload dummy instructions
-    end else begin
-        DataReady <= 0;
-        case (state)
-            IDLE: begin
-                if (ReadRequest) begin
-                    base_address <= {ReadAddress[31:(2 + $clog2(BLOCK_WORDS))], {(2 + $clog2(BLOCK_WORDS)){1'b0}}};
-                    delay_counter <= 0;
-                    word_counter <= 0;
-                    state <= T0_WAIT;
-                end
-            end
+// create flags to specify whether in-range 
+wire text_enable = (TEXT_START <= a_i) && (a_i < TEXT_END);
 
-            T0_WAIT: begin
-                if (delay_counter == T0_DELAY) begin
-                    DataIn <= memory[word_addr(base_address)];
-                    DataReady <= 1;
-                    word_counter <= 1;
-                    state <= BURST;
-                end else begin
-                    delay_counter <= delay_counter + 1;
-                end
-            end
+// create addresses 
+wire [TEXT_ADDRESS_WIDTH-1:0] text_address = a_i[2 +: TEXT_ADDRESS_WIDTH]-(TEXT_START[2 +: TEXT_ADDRESS_WIDTH]);
 
-            BURST: begin
-                if (word_counter < BLOCK_WORDS) begin
-                    DataIn <= memory[word_addr(base_address) + word_counter];
-                    DataReady <= 1;
-                    word_counter <= word_counter + 1;
-                end else begin
-                    state <= IDLE;
-                end
-            end
-        endcase
-    end
+// get read-data 
+wire [31:0] text_data = TEXT[ text_address ];
+
+// set rd_o iff a_i is in range 
+assign rd_o =
+    text_enable ? text_data : 
+    {32{1'bz}}; // not driven by this memory
+
+`ifdef SIM
+always @ * begin
+    if (a_i[1:0]!=2'b0)
+        $warning("Attempted to access invalid address 0x%h. Address coerced to 0x%h.", a_i, (a_i&(~32'b11)));
 end
+`endif
 
 endmodule

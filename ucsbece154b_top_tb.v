@@ -1,10 +1,16 @@
-// ucsbece154b_top_tb.v - Verilog 2001 Compliant Testbench using text.dat with top-level DUT
+// ucsbece154b_top_tb.v
+// All Rights Reserved
+// Copyright (c) 2024 UCSB ECE
+// Distribution Prohibited
+
 
 `define SIM
+
 `define ASSERT(CONDITION, MESSAGE) if ((CONDITION)==1'b1); else begin $error($sformatf MESSAGE); end
 
 module ucsbece154b_top_tb ();
 
+// test bench contents
 reg clk = 1;
 always #1 clk <= ~clk;
 reg reset;
@@ -57,74 +63,91 @@ wire [31:0] reg_t4 = top.riscv.dp.rf.t4;
 wire [31:0] reg_t5 = top.riscv.dp.rf.t5;
 wire [31:0] reg_t6 = top.riscv.dp.rf.t6;
 
-wire [31:0] fetchpc = top.riscv.dp.PCPlus4W;
+ wire [31:0] fetchpc = top.riscv.dp.PCPlus4W;
+
+// wire [31:0] MEM_10000000 = top.dmem.DATA[6'd0];
+
+//
 
 integer i;
-integer fetches = 0;
-integer hits = 0;
-integer misses = 0;
-
-// SDRAM model preload
-reg [31:0] memory [0:255];
-reg [31:0] pending_address;
-reg [5:0] delay_counter;
-reg [1:0] word_index;
-reg sdram_busy;
-
+<<<<<<< HEAD
+=======
+integer fetches, hits, misses;
+>>>>>>> parent of d7c0bba (tb)
 initial begin
-    $readmemh("text.dat", memory);
+$display( "Begin simulation." );
+//\\ =========================== \\//
 
-    $display("Begin simulation.");
-    reset = 1;
+reset = 1;
+@(negedge clk);
+@(negedge clk);
+reset = 0;
+
+
+<<<<<<< HEAD
+
+
+=======
+>>>>>>> parent of d7c0bba (tb)
+// Test for program 
+for (i = 0; i < 10000; i=i+1) begin
     @(negedge clk);
-    @(negedge clk);
-    reset = 0;
 
-    for (i = 0; i < 10000; i = i + 1) begin
-        @(negedge clk);
+<<<<<<< HEAD
+// counter for jumps
 
-        if (top.riscv.dp.BranchE_i) branchtotal++;
-        if (top.riscv.dp.JumpE_i) jumptotal++;
-        if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
-        if (~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
+if(top.riscv.dp.BranchE_i) branchtotal++;
+if(top.riscv.dp.JumpE_i) jumptotal++;
+if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
+if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
 
-        if (top.icache.ReadEnable) begin
-            fetches = fetches + 1;
-            if (top.icache.Ready) begin
-                hits = hits + 1;
-            end else if (top.icache.MemReadRequest && !sdram_busy) begin
-                misses = misses + 1;
-                sdram_busy = 1;
-                pending_address = top.icache.MemReadAddress;
-                delay_counter = 40;
-                word_index = 0;
-            end
-        end
+// counter for branches
 
-        if (sdram_busy) begin
-            if (delay_counter > 0) begin
-                delay_counter = delay_counter - 1;
-                mem_data_ready = 0;
-            end else begin
-                mem_data_in = memory[(pending_address >> 2) + word_index];
-                mem_data_ready = 1;
-                word_index = word_index + 1;
-                if (word_index == 4) begin
-                    sdram_busy = 0;
-                    mem_data_ready = 0;
-                end
-            end
-        end else begin
-            mem_data_ready = 0;
+//         if(fetchpc==32'h00010068) begin
+//		$display("#cycles = %d", i);  
+//	 break;
+//	 end
+end 
+       
+   // `ASSERT(fetchpc == 32'h00010064, ("reached last instruction"));    
+
+
+// WRITE YOUR TEST HERE
+
+// `ASSERT(rg_zero==32'b0, ("reg_zero incorrect"));
+// `ASSERT(MEM_10000070==32'hBEEF000, ("mem.DATA[29] //incorrect"));
+
+
+//\\ =========================== \\//
+$display( "End simulation.");
+$stop;
+=======
+
+    // counter for jumps
+    if(top.riscv.dp.BranchE_i) branchtotal++;
+    if(top.riscv.dp.JumpE_i) jumptotal++;
+    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.BranchE_i) branchpredictedcorrectly++;
+    if(~top.riscv.dp.MisspredictE_o & top.riscv.dp.JumpE_i) jumppredictedcorrectly++;
+
+    // NEW: Count cache accesses (fetches, hits, misses)
+    if (top.icache.ReadEnable) begin
+        fetches++;
+        if (top.icache.Ready) begin
+            hits++;
+        end else if (top.icache.MemReadRequest) begin
+            misses++;
         end
     end
+end 
 
-    $display("End simulation.");
-    $display("--- Performance Stats ---");
-    $display("Cache Fetches: %0d", fetches);
-    $display("Cache Hits:    %0d", hits);
-    $display("Cache Misses:  %0d", misses);
-    $stop;
+$display("End simulation.");
+$display("--- Performance Stats ---");
+$display("Cache Fetches: %0d", fetches);
+$display("Cache Hits:    %0d", hits);
+$display("Cache Misses:  %0d", misses);
+$stop;
+
+>>>>>>> parent of d7c0bba (tb)
 end
 
 endmodule

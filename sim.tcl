@@ -8,7 +8,6 @@ vlog +define+SIM -quiet -work work ucsbece154b_branch.v
 vlog +define+SIM -quiet -work work ucsbece154b_controller.v
 vlog +define+SIM -quiet -work work ucsbece154b_datapath.v
 vlog +define+SIM -quiet -work work ucsbece154_dmem.v
-vlog +define+SIM -quiet -work work ucsbece154_icache.v
 vlog +define+SIM -quiet -work work ucsbece154_imem.v
 vlog +define+SIM -quiet -work work ucsbece154b_riscv_pipe.v
 vlog +define+SIM -quiet -work work ucsbece154b_rf.v
