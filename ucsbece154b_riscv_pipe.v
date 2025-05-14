@@ -14,7 +14,8 @@ module ucsbece154b_riscv_pipe (
     output wire  [31:0] WriteDataM_o,
     input        [31:0] ReadDataM_i,
     output StallF,
-    input  ReadyF //added Ready instruction to stall fetch stage in case of cache miss
+    input  ReadyF, //added Ready instruction to stall fetch stage in case of cache miss
+    output wire [31:0] PCnewF_o
 );
 
 wire  StallD, FlushD, RegWriteW, FlushE, ALUSrcE; //, ZeroE, PCSrcE;
@@ -95,6 +96,7 @@ ucsbece154b_datapath dp (
     .ResultSrcM_i (ResultSrcM),
     .BranchE_i (BranchE),
     .JumpE_i (JumpE),
-    .BranchTypeE_i (BranchTypeE) 
+    .BranchTypeE_i (BranchTypeE),
+    .PCnewF_o(PCnewF_o)
 );
 endmodule
