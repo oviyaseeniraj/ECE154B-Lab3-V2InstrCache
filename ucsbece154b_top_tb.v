@@ -1,4 +1,4 @@
-// ucsbece154b_top_tb.v - Verilog 2001 Compliant Testbench for ICache
+// ucsbece154b_top_tb.v - Verilog 2001 Compliant Testbench using text.dat preload
 
 `define SIM
 `define ASSERT(CONDITION, MESSAGE) if ((CONDITION)==1'b1); else begin $error($sformatf MESSAGE); end
@@ -40,16 +40,15 @@ ucsbece154_icache icache_inst (
 );
 
 // SDRAM model (fake memory controller)
-reg [31:0] memory [0:255]; // 1KB instruction memory
+reg [31:0] memory [0:255]; // preload size
 reg [5:0] delay_counter;
 reg [1:0] word_index;
 reg [31:0] pending_address;
 reg sdram_busy;
 
 initial begin
-    // preload memory
-    for (i = 0; i < 256; i = i + 1)
-        memory[i] = 32'h00000013 + i; // dummy nop-like instrs
+    // preload program from hex file
+    $readmemh("text.dat", memory);
 
     // init
     reset = 1;
